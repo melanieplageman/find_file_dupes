@@ -1,0 +1,17 @@
+#! /bin/bash
+
+for i in $(seq 1 2000); do
+	# Generate a random filename
+	name="$(cat /dev/urandom | env LC_CTYPE=c tr -cd 'a-f0-9' | head -c 24)"
+
+	# Create the file with 20 MB random bytes
+	openssl rand -out "$name" -base64 $((20 * 1024 * 1024))
+
+	# Loop 200 times; 2% of the time copy the file to a duplicate file with a random name
+	for j in $(seq 1 200); do
+		if [ $((RANDOM % 100)) -le 1 ]; then
+			duplicate_name="$(cat /dev/urandom | env LC_CTYPE=c tr -cd 'a-f0-9' | head -c 24)"
+			cp "$name" "$duplicate_name"
+		fi
+	done
+done

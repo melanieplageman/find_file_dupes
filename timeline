@@ -1,0 +1,11 @@
+Serial:
+
+real	3m3.924s
+user	0m51.636s
+sys	1m58.940s
+
+Parallel 1:
+
+real	1m46.893s
+user	0m50.572s
+sys	2m22.157s
