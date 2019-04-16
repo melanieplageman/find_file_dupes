@@ -38,32 +38,79 @@ bool is_same_file(char *name_1, char *name_2) {
 	return result;
 }
 
-typedef struct _read_params
+typedef struct _pair_t
 {
-	size_t start_idx;
-	size_t end_idx;
-	char **names;
-} read_params;
+	bool is_done;
+	mx_string_t name_1;
+	mx_string_t name_2; 
+} pair_t;
 
-void *do_work(void *work_params)
+pair_t *queue;
+size_t queue_head = 0;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+
+pthread_mutex_t results_mutex = PTHREAD_MUTEX_INITIALIZER;
+size_t results_count = 0;
+pthread_cond_t results_cond = PTHREAD_COND_INITIALIZER;
+
+void enqueue_pair(pair_t *p) {
+	if (pthread_mutex_lock(&mutex) != 0)
+		abort();
+
+	queue = mx_vector_append(queue, p);
+	
+	if (mx_vector_length(queue) == 1)
+		pthread_cond_signal(&cond);
+
+	pthread_mutex_unlock(&mutex);
+}
+
+void dequeue_pair(pair_t *p) {
+	if (pthread_mutex_lock(&mutex) != 0)
+		abort();
+
+	if (mx_vector_length(queue) == 0)
+		pthread_cond_wait(&cond, &mutex);
+
+	pair_t dequeued = queue[queue_head];
+	queue_head++;
+	pthread_mutex_unlock(&mutex);
+	*p = dequeued;
+}
+
+void *thread_main(void *data)
 {
-	read_params *params = (read_params *) work_params;
+	while (true) {
+		pair_t p;
+		dequeue_pair(&p);
+		if (p.is_done)
+			return NULL;
 
-	for (size_t i = params->start_idx; i < params->end_idx; i++)
-	{
-		mx_string_t name_1 = params->names[i];
-		for (size_t j = 0; j < mx_vector_length(params->names); j++)
-		{
-			mx_string_t name_2 = params->names[j];
-			if (strcmp(name_1, name_2) == 0)
-				continue;
-			if (!is_same_file(name_1, name_2))
-				continue;
-
-			printf("%s, %s\n", name_1, name_2);
+		if (strcmp(p.name_1, p.name_2) == 0) {
+			pthread_mutex_lock(&results_mutex);
+			results_count++;
+			pthread_cond_signal(&results_cond);
+			pthread_mutex_unlock(&results_mutex);
+			continue;
 		}
+		if (!is_same_file(p.name_1, p.name_2)) {
+			pthread_mutex_lock(&results_mutex);
+			results_count++;
+			pthread_cond_signal(&results_cond);
+			pthread_mutex_unlock(&results_mutex);
+			continue;
+		}
+
+		printf("%s, %s\n", p.name_1, p.name_2);
+
+		pthread_mutex_lock(&results_mutex);
+		results_count++;
+		pthread_cond_signal(&results_cond);
+		pthread_mutex_unlock(&results_mutex);
 	}
-	return 0;
+
+	return NULL;
 }
 
 int main(int argc, char **argv)
@@ -84,24 +131,49 @@ int main(int argc, char **argv)
 
 	size_t names_length = mx_vector_length(names);
 
-	read_params *params_1 = malloc(sizeof(read_params));
-	params_1->start_idx = 0;
-	params_1->end_idx = names_length / 2;
-	params_1->names = names;
+	queue = mx_vector_create(sizeof(pair_t));
 
 	pthread_t thread_1;
-	pthread_create(&thread_1, NULL, &do_work, params_1);
-
-	read_params *params_2 = malloc(sizeof(read_params));
-	params_2->start_idx = names_length / 2;
-	params_2->end_idx = names_length;
-	params_2->names = names;
+	pthread_create(&thread_1, NULL, &thread_main, NULL);
 
 	pthread_t thread_2;
-	pthread_create(&thread_2, NULL, &do_work, params_2);
+	pthread_create(&thread_2, NULL, &thread_main, NULL);
+
+	pthread_t thread_3;
+	pthread_create(&thread_3, NULL, &thread_main, NULL);
+
+	/* pthread_t thread_4; */
+	/* pthread_create(&thread_4, NULL, &thread_main, NULL); */
+
+	names_length = 200;
+
+	for (size_t i = 0; i < names_length; i++)
+	{
+		for (size_t j = 0; j < names_length; j++)
+		{
+			pair_t p = { .name_1 = names[i], .name_2 = names[j], .is_done = false };
+			enqueue_pair(&p);
+		}
+	}
+
+	pair_t p = { .is_done = true };
+	enqueue_pair(&p);
+	enqueue_pair(&p);
+	enqueue_pair(&p);
+	/* enqueue_pair(&p); */
 
 	pthread_join(thread_1, NULL);
 	pthread_join(thread_2, NULL);
+	pthread_join(thread_3, NULL);
+	/* pthread_join(thread_4, NULL); */
 
-	return 0;
+	/* while (true) { */
+	/* 	pthread_mutex_lock(&results_mutex); */
+	/* 	if (results_count == names_length * names_length) */
+	/* 		return 0; */
+	/* 	pthread_cond_wait(&results_cond, &results_mutex); */
+	/* 	pthread_mutex_unlock(&results_mutex); */
+	/* } */
+
+	return 1;
 }
