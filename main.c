@@ -42,7 +42,7 @@ typedef struct _pair_t
 {
 	bool is_done;
 	mx_string_t name_1;
-	mx_string_t name_2; 
+	mx_string_t name_2;
 } pair_t;
 
 pair_t *queue;
@@ -59,7 +59,7 @@ void enqueue_pair(pair_t *p) {
 		abort();
 
 	queue = mx_vector_append(queue, p);
-	
+
 	if (mx_vector_length(queue) == 1)
 		pthread_cond_signal(&cond);
 
@@ -139,8 +139,8 @@ int main(int argc, char **argv)
 	pthread_t thread_2;
 	pthread_create(&thread_2, NULL, &thread_main, NULL);
 
-	pthread_t thread_3;
-	pthread_create(&thread_3, NULL, &thread_main, NULL);
+	/* pthread_t thread_3; */
+	/* pthread_create(&thread_3, NULL, &thread_main, NULL); */
 
 	/* pthread_t thread_4; */
 	/* pthread_create(&thread_4, NULL, &thread_main, NULL); */
@@ -159,12 +159,12 @@ int main(int argc, char **argv)
 	pair_t p = { .is_done = true };
 	enqueue_pair(&p);
 	enqueue_pair(&p);
-	enqueue_pair(&p);
+	/* enqueue_pair(&p); */
 	/* enqueue_pair(&p); */
 
 	pthread_join(thread_1, NULL);
 	pthread_join(thread_2, NULL);
-	pthread_join(thread_3, NULL);
+	/* pthread_join(thread_3, NULL); */
 	/* pthread_join(thread_4, NULL); */
 
 	/* while (true) { */
